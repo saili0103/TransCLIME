@@ -130,7 +130,8 @@ Trans.CLIME<-function(X,X.A, lambda, agg=T, Theta.cl=NULL){
   Omega.hat
 }
 
-####LS aggregation function
+####LS aggregation function with 
+### Theta.init=(Omega.clime, Theta.hat) and X.til: some primary samples
 Agg<-function(Theta.init, X.til){
   p<-ncol(X.til)
   n.til<-nrow(X.til)
@@ -148,5 +149,83 @@ Agg<-function(Theta.init, X.til){
   Theta.hat<-sapply(1:p, function(j) cbind(Theta.init[,j], Theta.init[,p+j])%*% v.mat[,j])
   
   Theta.hat
+}
+
+###cross validation for selecting tuning parameters
+cv.clime<-function(X, nfold=5){
+  library(caret)
+  folds<-createFolds(1:nrow(X), k=nfold)
+  te<-NULL
+  lam.seq<-seq(0.3,1.2,length.out=10)*2*sqrt(log(p)/nrow(X)*nfold/(nfold-1))
+  for(i in 1:nfold){
+    te<-rbind(te,sapply(lam.seq, function(lam){
+      cur.clime<-Myfastclime.s(X=X[-folds[[i]],], Bmat=diag(1,p), lambda=lam)$Theta.hat
+      Dist(X.test=X[folds[[i]],], Theta.hat=cur.clime, diag(1,ncol(X)))$te})
+    )
+  }
+  te.min<-which.min(colMeans(te))
+  te.ave<-colMeans(te)
+  cat(te.ave,'\n')
+  if(te.ave[te.min]==te.ave[1] | te.ave[te.min]==te.ave[10]){
+    lam<-seq(0.3,1.2,length.out=10)[which(diff(sign(diff(te)))==2)+1]
+    if(length(lam)==0){
+      lam<-seq(0.3,1.2,length.out=10)[te.min]
+    }
+  }else{
+    lam<-seq(0.3,1.2,length.out=10)[te.min]
+  }
+  lam
+}
+
+#####debiasing Theta based on debiasing samples X
+DB.clime.FDR<- function(Theta, X){
+  # Theta<-lavaSearch2:::symmetrize(Theta, update.upper = TRUE)
+  n<-nrow(X)
+  p<-ncol(X)
+  Sig.hat<-cov(X)
+  pval.all<-NULL
+  diag(Theta)<-sapply(1:p, function(j) max(Theta[j,j],0.05))
+  for( i in 1: (p-1)){  
+    for(j in (i+1):p){
+      db.est<-as.numeric(Theta[i,j] +Theta[j,i]- t(Theta[,i])%*%Sig.hat%*%Theta[,j])
+      db.sd<-sqrt(Theta[i,i]*Theta[j,j]+Theta[i,j]*Theta[j,i])/sqrt(n)
+      pval.ij<-2*(1-pnorm(abs(db.est/db.sd)))
+      pval.all<-rbind(pval.all, c(i,j,pval.ij, db.est/db.sd))
+    }
+  }
+  pval.all
+}
+
+####FDR control function with input 
+###z.abs: absolute value of z-scores; alpha: fdr level.
+BH.func<-function(z.abs,alpha, plot=F){
+  M=length(z.abs)
+  fdr.est<-NULL
+  t.seq<-seq(0,sqrt(2*log(M)-2*log(log(M))),0.01)
+  for(t in t.seq){
+    fdr.est<-c(fdr.est,M*2*(1-pnorm(t))/max(sum(z.abs>= t),1))
+  }
+  t.hat<-NULL
+  t.hat<- t.seq[which(fdr.est<=alpha)[1]]
+  if(plot){
+    plot(t.seq,fdr.est, type='l')
+    abline(h=alpha, col='blue')
+  }
+  
+  if(is.na(t.hat)){
+    t.hat<-sqrt(2*log(M))
+  }
+  #cat(t.hat, which(Z.w > t.hat),'\n')
+  which(z.abs >= t.hat)
+}
+
+###compute the estimation errors based on the test samples X.test
+Dist<- function(X.test, Theta.hat,Theta0){ ###compute the ell_2 error
+  p<-ncol(Theta.hat)
+  Theta.hat<-lavaSearch2:::symmetrize(Theta.hat, update.upper = TRUE)
+  Theta<-Spd.proj(SigA.hat=Theta.hat, eps=0.001)$mat
+  eigens<-eigen(Theta)$values
+  te=sum(diag(cov(X.test)%*%Theta))/2-sum(log(eigens[eigens>0]))/2
+  list(Frob=sum((Theta.hat-Theta0)^2)/p, S=max(abs(svd(Theta.hat-Theta0)$d))^2, te=te)
 }
 
