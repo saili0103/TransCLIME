@@ -1,8 +1,8 @@
 ###an example
-source('~/Dropbox/Transfer-learning-GGM/Code/CLIME-opt.R') 
+source('~/CLIME-opt.R') 
 set.seed(123)
 p=200
-Theta0.type='Bdiag' # or toep
+Theta0.type='Bdiag' # or Toep
 K=5
 n.vec<-c(150,rep(300,K))
 A.size=3
