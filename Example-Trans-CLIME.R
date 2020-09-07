@@ -16,7 +16,7 @@ const=0.5
 n0=round(n.vec[1]*2/3)
 Theta.re0<-Myfastclime.s(X=X.all[1:n0,], Bmat=diag(1,p), lambda=const*2*sqrt(log(p)/n0))
 Theta.hat0<-Theta.re0$Theta.hat
-unlist(Dist(X.test=dat.all$X.test, Theta.hat0, Theta0))
+unlist(Dist(X.test=dat.all$X.test, Theta.hat0, Theta0)) #get estimation errors and prediction errors
 ###Trans-CLIME algorithm
 if(A.size>0){
   nA<-sum(n.vec[2:(A.size+1)])
@@ -26,9 +26,7 @@ if(A.size>0){
   Omega.hat<-Theta.hat0
 }
 unlist(Dist(dat.all$X.test, Omega.hat, Theta0))
-#thresholded Trans-CLIME
-Omega.th<-apply(Omega.hat, 2, function(x) x*(rank(abs(x))>=9*p/10)) #thresholded Trans.CLIME 
-unlist(Dist(dat.all$X.test, Omega.th, Theta0))
+
 #pooled Trans-CLIME
 if(A.size==K){
   Pooled.clime=Omega.hat
@@ -38,5 +36,11 @@ if(A.size==K){
 }
 unlist(Dist(dat.all$X.test, Pooled.clime, Theta0))
 
-
+###debiasing and FDR control
+pval.all.clime<-DB.clime.FDR(Theta=Theta.hat0,X=X.all[1:n.vec[1],])
+clime.pairs<- pval.all.clime[BH.func(abs(pval.all.clime[,4]), 0.1),1:2] 
+pval.all.itl<-DB.clime.FDR(Theta=Omega.hat,X=X.all[1:n.vec[1],])
+itl.pairs<-pval.all.itl[BH.func(abs(pval.all.itl[,4]), 0.1),1:2] 
+pval.all.pooled<-DB.clime.FDR(Theta=Pooled.clime,X=X.all[1:n.vec[1],])
+pooled.pairs<-pval.all.pooled[BH.func(abs(pval.all.pooled[,4]), 0.1),1:2] 
 

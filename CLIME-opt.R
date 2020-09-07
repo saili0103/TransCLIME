@@ -110,19 +110,19 @@ Trans.CLIME<-function(X,X.A, lambda, agg=T, Theta.cl=NULL){
   p<-ncol(X)
   sigA.hat<-mean(apply(X.A, 2, sd))
   sig0.hat<-mean(apply(X, 2, sd))
+  if(is.null(Theta.cl)){
+    Theta.cl<-Myfastclime.s(X=X[1:n0,], Bmat=diag(1,p), lambda=lambda*sqrt(nA/n0))$Theta.hat
+  }
   lam.delta<-2*sig0.hat*sqrt(log(p)/n0) #+2*sigA.hat*sqrt(log(p)/nA)
   Delta.re <- Myfastclime.s(X=X[1:n0,], Bmat=cov(X)-cov(X.A), lambda=lam.delta, scale=F)
-  if(Delta.re$conv){
-    Delta.hat<-Delta.re$Theta.hat
-  }else{
-    Delta.hat<-diag(0,p)
-  }
-  Theta.re <- Myfastclime.s(X=cov(X.A), Bmat=diag(1,p)-t(Delta.hat), 
-                               lambda=lambda)
+  if(Delta.re$conv){ Delta.init<-Delta.re$Theta.hat}else{ Delta.init<-diag(0,p)}
+  
+  Theta.db<-Delta.init+ Theta.cl%*%(cov(X[1:n0,])-cov(X.A))
+  Delta.re <- Myfastclime.s(X=diag(1,p), Bmat=Theta.db, lambda=2*lam.delta, scale=F)
+  if(Delta.re$conv){Delta.hat<-Delta.re$Theta.hat}else{ Delta.hat<-diag(0,p) }
+
+  Theta.re <- Myfastclime.s(X=cov(X.A), Bmat=diag(1,p)-t(Delta.hat), lambda=lambda)
   if(agg){
-    if(is.null(Theta.cl)){
-      Theta.cl<-Myfastclime.s(X=X[1:n0,], Bmat=diag(1,p), lambda=lambda*sqrt(nA/n0))$Theta.hat
-    }
     Omega.hat<-Agg(Theta.init=cbind(Theta.cl, Theta.re$Theta.hat), X.til=X[-(1:n0),])
   }else{
     Omega.hat<-Theta.tl.re$Theta.hat
