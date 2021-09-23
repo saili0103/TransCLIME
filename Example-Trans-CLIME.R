@@ -1,5 +1,5 @@
 ###an example
-source('~/CLIME-opt-0330.R') 
+source('~/CLIME-opt.R') 
 set.seed(123)
 p=200
 Theta0.type='Toep' # or Bdiag or Rand
